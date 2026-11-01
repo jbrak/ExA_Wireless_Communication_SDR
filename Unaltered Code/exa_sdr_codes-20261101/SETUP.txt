@@ -1,0 +1,212 @@
+==============================================================================
+  PLUTO SDR SOFTWARE SETUP  -  macOS (MacBook) and Windows
+==============================================================================
+
+This guide installs everything needed to run the scripts in this folder with
+an ADALM-Pluto SDR.
+
+  1. What gets installed
+  2. macOS setup
+  3. Windows setup
+  4. Configuring the scripts
+  5. Setting the receive gain
+  6. Running
+  7. Troubleshooting
+
+
+==============================================================================
+1. WHAT GETS INSTALLED
+==============================================================================
+
+  USB driver ...... lets the computer talk to the Pluto
+                    macOS: built in, nothing to do
+                    Windows: install the Pluto USB driver (step W1)
+
+  libiio .......... the C library that actually talks to the Pluto
+                    installed with an installer (.pkg on macOS, .exe on Windows)
+
+  pylibiio ........ Python bindings for libiio (Python name: iio)   -> pip
+  pyadi-iio ....... Pluto API used by the scripts (Python name: adi) -> pip
+  numpy, scipy, matplotlib, pillow ......................................  -> pip
+
+
+==============================================================================
+2. macOS SETUP
+==============================================================================
+
+STEP M1 - Python
+  Any Python 3.9 or newer works. Check:
+      python3 --version
+  If it is missing or older, install it from https://www.python.org.
+
+  NOTE: on macOS the command is often "python3" instead of "python".
+  If "python" is not found, use "python3" in every command of this guide.
+
+STEP M2 - libiio 1.0
+  a) Go to:  https://github.com/analogdevicesinc/libiio/releases
+     and open the v1.0 release.
+  b) Download the macOS .pkg installer.
+     If there are separate files for Apple silicon (arm64) and Intel
+     (x86_64), pick yours: Apple menu > About This Mac > "Chip".
+  c) Double-click and install.
+     If macOS blocks it: System Settings > Privacy & Security > Open Anyway.
+
+  Check (in Terminal):
+      iio_info -V
+  It should report version 1.0.
+
+STEP M3 - Python packages (in Terminal)
+      python -m pip install pylibiio==1.0 pyadi-iio numpy scipy matplotlib pillow
+
+STEP M4 - Find the Pluto's address (URI)
+  Plug the Pluto in with a DATA USB cable (not a charge-only cable) and wait
+  about 20 seconds for it to start. Then:
+      iio_info -S usb
+  It prints something like:  usb:0.3.5
+  Write this down - it goes into the scripts.
+
+  NOTE: on macOS this number depends on the USB port. If you change port or
+  use a hub, run the command again.
+  The address ip:192.168.2.1 usually works as well.
+
+STEP M5 - Final check
+      python -c "import adi; print('pyadi-iio OK')"
+  Expected output:
+      pyadi-iio OK
+
+
+==============================================================================
+3. WINDOWS SETUP
+==============================================================================
+
+STEP W1 - Pluto USB driver
+  a) Go to:  https://github.com/analogdevicesinc/plutosdr-m2k-drivers-win/releases
+  b) Download and run  PlutoSDR-M2k-USB-Drivers.exe  (latest release).
+  c) Plug in the Pluto.
+
+STEP W2 - Python
+  Any 64-bit Python 3.9 or newer works. Check:
+      python --version
+  If it is missing or older, install it from https://www.python.org and
+  tick "Add python.exe to PATH" during installation.
+
+STEP W3 - libiio 1.0
+  a) Go to:  https://github.com/analogdevicesinc/libiio/releases
+     and open the v1.0 release.
+  b) Download the 64-bit Windows installer (.exe) and run it.
+
+  Check (open a NEW Command Prompt):
+      iio_info -V
+
+  NOTE: Python looks for the file libiio1.dll. If Python later says it
+  cannot find libiio, add the folder that contains libiio1.dll (inside the
+  libiio install folder) to the PATH environment variable, then open a new
+  terminal.
+
+STEP W4 - Python packages
+      python -m pip install pylibiio==1.0 pyadi-iio numpy scipy matplotlib pillow
+
+STEP W5 - Find the Pluto's address (URI)
+      iio_info -S
+  Use the usb:... text it prints, or ip:192.168.2.1
+
+STEP W6 - Final check
+      python -c "import adi; print('pyadi-iio OK')"
+
+
+==============================================================================
+4. CONFIGURING THE SCRIPTS
+==============================================================================
+
+FIRST - the WINDOWS-ONLY block (depends on the operating system)
+  The transmitter files (exa_sdr_tx_image.py, exa_sdr_tx_text.py) start with
+  a block marked
+      # >>> WINDOWS-ONLY BLOCK - BEGIN >>>
+      ...
+      # <<< WINDOWS-ONLY BLOCK - END <<<
+    - On WINDOWS: keep it unchanged.
+    - On macOS:   delete it, from the BEGIN line to the END line. Keep the
+                  "import iio" and "import adi" lines that follow it.
+  The receiver files do NOT contain this block. If you run a receiver on
+  WINDOWS, copy the whole block (BEGIN to END) from a transmitter file and
+  paste it at the top of the receiver file, before its first "import" line.
+
+Then, on each computer, change ONLY these:
+
+  Pluto address (URI)
+    - exa_sdr_tx_text.py, exa_sdr_rx_text.py:
+          PLUTO_URI = "usb:0.3.5"
+    - exa_sdr_tx_image.py, exa_sdr_rx_image.py:
+          the address is typed directly in the adi.Pluto("...") line inside
+          connect_pluto() / connect_pluto_rx(). Change it there (and, for
+          a tidy message, in the print line just above it).
+
+  Receive gain  (receiving computer, see section 5)
+    - receive_gain = ...   in exa_sdr_rx_image.py
+    - RECEIVE_GAIN = ...   in exa_sdr_rx_text.py
+
+  Transmit gain  (transmitting computer, range -89 to 0 dB)
+    - transmit_gain = ...  in exa_sdr_tx_image.py
+    - TRANSMIT_GAIN = ...  in exa_sdr_tx_text.py
+
+Everything else (carrier frequency, sample rate, FFT size, cyclic prefix,
+pilots, modulation, cat.jpeg) MUST be identical on both computers.
+
+
+==============================================================================
+5. SETTING THE RECEIVE GAIN 
+==============================================================================
+
+Start the transmitter first. Then, on the RECEIVING computer, run the one
+command below for your system.
+Replace usb:0.3.5 with your address and 35 with the gain you want to try.
+
+macOS (Terminal):
+
+python -c "import adi, numpy as np; p = adi.Pluto('usb:0.3.5'); p.rx_lo = int(2.4e9); p.sample_rate = 960000; p.rx_rf_bandwidth = 960000; p.gain_control_mode_chan0 = 'manual'; p.rx_hardwaregain_chan0 = 35; p.rx_buffer_size = 2**20; p.rx(); x = p.rx(); print('peak:', int(max(abs(x.real).max(), abs(x.imag).max())), ' (aim 800-1500, 2047+ = clipping)')"
+
+Windows (Command Prompt) - same command with the WINDOWS-ONLY fix built in:
+
+python -c "import ctypes.util as u; f = u.find_library; u.find_library = lambda n: r'C:\Windows\System32\libiio.dll' if n in ('iio', 'libiio') else ('ucrtbase.dll' if n == 'c' else f(n)); import adi, numpy as np; p = adi.Pluto('usb:0.3.5'); p.rx_lo = int(2.4e9); p.sample_rate = 960000; p.rx_rf_bandwidth = 960000; p.gain_control_mode_chan0 = 'manual'; p.rx_hardwaregain_chan0 = 35; p.rx_buffer_size = 2**20; p.rx(); x = p.rx(); print('peak:', int(max(abs(x.real).max(), abs(x.imag).max())), ' (aim 800-1500, 2047+ = clipping)')"
+
+How to read the result:
+    peak  800 - 1500   ->  GOOD. Use this gain in the RX script.
+    peak  2047 or more ->  CLIPPING. Lower the gain.
+    peak  below ~100   ->  TOO WEAK. Raise the gain (RX or TX) or move closer.
+
+
+==============================================================================
+6. RUNNING
+==============================================================================
+
+                    IMAGE                             TEXT
+  Transmitter       python exa_sdr_tx_image.py        python exa_sdr_tx_text.py
+  Receiver          python exa_sdr_rx_image.py        python exa_sdr_rx_text.py
+
+  Always start the transmitter first.
+
+
+==============================================================================
+7. TROUBLESHOOTING
+==============================================================================
+
+PROBLEM:  Windows: "import iio" / "import adi" fails (e.g. a TypeError or
+          "Could not find libiio" when the script starts)
+CAUSE:    The WINDOWS-ONLY block is missing (e.g. in a receiver file)
+FIX:      Copy the block into the file (section 4, "FIRST")
+
+
+PROBLEM:  Windows: Python cannot find libiio1.dll
+CAUSE:    libiio not installed, or its folder not on PATH
+FIX:      Install libiio 1.0, add its DLL folder to PATH, open a new terminal
+
+PROBLEM:  "No IIO context found" / connection to PlutoSDR failed
+CAUSE:    Pluto not started yet, charge-only cable, missing Windows driver,
+          or wrong address
+FIX:      Wait 20 s after plugging in, use a data cable, install the driver
+          (W1), run  iio_info -S  again and update the address
+
+PROBLEM:  Address worked yesterday, fails today (macOS)
+CAUSE:    Different USB port gives a different usb:x.y.z
+FIX:      Run  iio_info -S usb  again
+
