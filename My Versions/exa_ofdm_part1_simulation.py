@@ -435,6 +435,16 @@ def task2_digital_symbols():
 # ================================================================== #
 #  TASK 3 :  Building a simple OFDM symbol (ideal channel)           #
 # ================================================================== #
+
+# OFDM symbol generation and recovery (ideal channel, no noise)
+# Take your bit stream and encode them into symbols (BPSK or QPSK).
+# Split up the working section of your frequncy band into N orthognal subcarriers (bins)
+# and place the symbols on the active subcarriers, the remaining subcarriers are set to zero.
+# IFFT to time domain to convert into a time-domain OFDM symbol which can be transmitted.
+# At the receiver, FFT back to frequency domain and extract the active subcarriers.
+# Extract the symbols and demodulate back to bits.
+# Check that the recovered bits match the original bits.
+
 def task3_basic_ofdm():
     print("\n=== Task 3: Basic OFDM symbol (ideal channel) ===")
 
@@ -694,14 +704,36 @@ def add_cp(symbol, cp_len):
     """Prepend a cyclic prefix: copy the last cp_len samples to the front."""
     return np.concatenate([symbol[-cp_len:], symbol])
 
+# Multipath is where when consective blocks of symbols A and B are transmitted
+# the tail of A can arrive at the receiver at the same time as the head of B.
+# This is commonplace due to reflections off buildings, walls, etc
+# Adding a cyclic prefix of the last samples of B to the front of B
+# Allows the tail of A to arrive, interfere with the cyclic prefix of B
+# and then be discarded with the entire prefix
+# Since each subcarrier completes a whole number of cycles in block B
+# This results in the information carrying portion of B containing no interference from A
+# It instead contains a scaled and shifted version of the last samples of B
+# This holds the same information as the original B, as is still classified in the same
+# Frequncy bins, but instead its constellation points are rotated
+# and scaled by the channel frequency response
+# If this is a known transfer function we can simply reverse the scaling and
+# rotation to recover the original constellation points
 
 def task5_cyclic_prefix():
     print("\n=== Task 5: Cyclic prefix and multipath ===")
 
+    # Define the total number of frequency bins (FFT size)
+    # and the length of the cyclic prefix.
     N = 64
     cp_len = 16
+
+    # Define the indices of the active subcarriers (bins 1 to 16)
+    # and the number of active subcarriers.
     active = np.arange(1, 17)
     n_active = len(active)
+
+    # Define the number of OFDM symbols to transmit in the
+    # stream and the bits per symbol for QPSK modulation.
     M = 2000                       # number of OFDM symbols in the stream
     bps = 2                        # QPSK
 
@@ -711,36 +743,91 @@ def task5_cyclic_prefix():
         recovered subcarriers of one mid-stream symbol.  The only difference
         between the two runs is the cyclic prefix, so any difference is its doing.
         """
+
+        # Compute the channel frequency response by
+        # taking the FFT of the channel impulse response h.
         H = np.fft.fft(h, N)                       # channel frequency response
+
+        # define empty lists to store the transmitted bits,
+        # transmitted symbols, and ideal symbols for each OFDM symbol in the stream.
         all_bits, all_symbols, all_ideal = [], [], []
+
+        # Loop through the specified number of OFDM symbols
+        # (M) to generate and transmit each symbol through the multipath channel.
         for _ in range(M):
+
+            # Generate random bits for the active
+            # subcarriers based on the bits per symbol for QPSK modulation.
             bits = random_bits(n_active * bps)
+
+            # Modulate the random bits into QPSK symbols, then modulate those symbols into a time-domain OFDM signal
             sym_f = qpsk_modulate(bits)
             sym = ofdm_modulate(sym_f, N, active)
+
+            # if using a cyclic prefix, prepend the last
+            # cp_len samples of the OFDM symbol to the front.
             if use_cp:
                 sym = add_cp(sym, cp_len)
+
+            # Append the generated bits, transmitted symbols,
+            # and ideal symbols to their respective lists for later processing.
             all_bits.append(bits)
             all_symbols.append(sym)
             all_ideal.append(sym_f)
 
+        # Concatenate all transmitted symbols into a single
+        # time-domain stream for transmission through the multipath channel.
         tx_stream = np.concatenate(all_symbols)
+
+        # Convolve the transmitted stream with the channel impulse
+        # response h to simulate the effect of the multipath channel.
         rx_stream = np.convolve(tx_stream, h)      # multipath channel
 
+        # Define the block length for each OFDM symbol, which includes the cyclic prefix if used.
         block = N + cp_len if use_cp else N
+
+        # Initialize variables to accumulate the total number of bit errors, total bits transmitted,
+        # and a list to store the error vector magnitude (EVM) for each OFDM symbol.
         errors, total, evm = 0, 0, []
+
+        # initialize a variable to store the recovered subcarriers of one mid-stream symbol for later visualization.
         mid_const = None
+
+        # Loop through each OFDM block in the received stream to process and recover the transmitted bits.
         for k in range(M):
+
+            # Extract the received block corresponding to the current OFDM block from the received stream.
             seg = rx_stream[k * block:(k + 1) * block]
+
+            # IF we are using a cylcic prefix, remove the cyclic prefix from the received block to obtain the actual
+            # OFDM symbol.
             if use_cp:
                 seg = seg[cp_len:]                  # remove cyclic prefix
+
+            # Perform the FFT on the received OFDM block to convert it back to the frequency domain.
             seg = seg[:N]
+
+            # Fast fourier transform of the received OFDM block to convert it back to the frequency domain.
             Y = np.fft.fft(seg)
+
+            # Extract the received symbols corresponding to the active subcarriers from the FFT output.
             X_hat = Y[active] / H[active]           # one-tap equaliser
+
+            # Calculate the number of bit errors by comparing the original transmitted bits with the demodulated received bits.
             errors += np.sum(all_bits[k] != qpsk_demodulate(X_hat))
+
+            # Accumulate the total number of bits transmitted for the current OFDM symbol.
             total += len(all_bits[k])
+
+            # Calculate the error vector magnitude (EVM) for the current OFDM symbol by
+            # computing the mean squared error between the recovered symbols and the ideal symbols.
             evm.append(np.mean(np.abs(X_hat - all_ideal[k]) ** 2))
+
+            # Store the recovered subcarriers of one mid-stream symbol for later visualization.
             if k == M // 2:
                 mid_const = X_hat
+
+        # Return the bit error rate (BER), mean EVM, and the recovered subcarriers of one mid-stream symbol.
         return errors / total, float(np.mean(evm)), mid_const
 
     # Two channels: (1) the sheet's mild echo, (2) a stronger/longer echo.
@@ -750,14 +837,29 @@ def task5_cyclic_prefix():
             np.array([1.0, 0, 0, 0, 0, 0.7]),
     }
 
+    # Create a plot with subplots to visualize the effect of the
+    # multipath channel on the received symbols with and without a cyclic prefix.
     fig, axes = plt.subplots(len(channels), 2, figsize=(9, 8))
+
+    # Loop through each channel in the channels dictionary to simulate the transmission and reception of OFDM symbols
     for row, (name, h) in enumerate(channels.items()):
+
+        # Run the simulation for the current channel
+        # without a cyclic prefix and store the results (BER, EVM, and recovered subcarriers).
         ber_no, evm_no, const_no = run_stream(h, use_cp=False)
+
+        # Run the simulation for the current channel with a
+        # cyclic prefix and store the results (BER, EVM, and recovered subcarriers).
         ber_yes, evm_yes, const_yes = run_stream(h, use_cp=True)
+
+        # Print the results for the current channel, including the channel name,
+        # memory length, cyclic prefix length, BER, and EVM for both cases (with and without cyclic prefix).
         print(f"\n  Channel: {name}   memory = {len(h) - 1} samples (CP = {cp_len})")
         print(f"    WITHOUT CP : BER = {ber_no:.3e}   EVM = {evm_no:.4f}")
         print(f"    WITH    CP : BER = {ber_yes:.3e}   EVM = {evm_yes:.4f}")
 
+        # Plot the recovered symbols in the complex plane (I vs Q) for
+        # both cases (with and without cyclic prefix) for the current channel.
         a0, a1 = axes[row]
         a0.scatter(const_no.real, const_no.imag, s=10, alpha=0.4, color="C3")
         a0.set(title=f"No CP\nBER={ber_no:.1e}, EVM={evm_no:.3f}",
@@ -791,25 +893,47 @@ def apply_frequency_offset(samples, f_offset, fs):
 def task6_frequency_offset():
     print("\n=== Task 6: Frequency offset ===")
 
+    # Define the total number of frequency bins (FFT size),
+    # the indices of the active subcarriers, and the sampling rate.
     N = 64
     active = np.arange(1, 17)
     n_active = len(active)
     fs = 1e6                        # sampling rate [Hz]
 
+    # define variables for the number of OFDM
+    # symbols to transmit in the stream and the bits per symbol for QPSK modulation.
     bits = random_bits(n_active * 2)
     symbols = qpsk_modulate(bits)
+
+    # Define the transmitted time-domain OFDM signal
+    # by modulating the symbols into an OFDM symbol using the IFFT.
     tx = ofdm_modulate(symbols, N, active)
 
     # small and larger offsets (as a fraction of the subcarrier spacing fs/N)
     df_sub = fs / N                 # subcarrier spacing
     offsets = [0.0, 0.02 * df_sub, 0.3 * df_sub]   # 0, small, larger
 
+    # Define a plot with three subplots to visualize the effect of frequency offset on the received symbols.
     fig, ax = plt.subplots(1, 3, figsize=(12, 4))
+
+    # Loop through each frequency offset in the offsets
+    # list to simulate the effect of frequency offset on the received symbols.
     for col, foff in enumerate(offsets):
+
+        # Apply the frequency offset to the transmitted signal by multiplying it with a complex exponential.
         rx = apply_frequency_offset(tx, foff, fs)
+
+        # Demodulate the received time-domain OFDM signal back into symbols using the FFT,
         rx_sym = ofdm_demodulate(rx, N, active)
+
+        # Plot the received symbols in the complex plane (I vs Q) for the current frequency offset.
         ax[col].scatter(np.real(rx_sym), np.imag(rx_sym), color="C4", zorder=3)
+
+        # Calculate the frequency offset as a fraction of the subcarrier spacing for display in the plot title.
         frac = foff / df_sub
+
+        # Set the title and labels for the subplot,
+        # including the frequency offset in Hz and as a fraction of the subcarrier spacing.
         ax[col].set(title=f"offset = {foff:.0f} Hz  ({frac:.2f} x subcarrier)",
                     xlabel="I", ylabel="Q", xlim=(-1.6, 1.6), ylim=(-1.6, 1.6))
         ax[col].axhline(0, color="k", lw=0.5); ax[col].axvline(0, color="k", lw=0.5)
@@ -821,13 +945,26 @@ def task6_frequency_offset():
 
     # --- optional extension: correction by counter-rotation -------- #
     # 0.3 x spacing rotates QPSK past 45 deg, so errors appear before correction
+
+    # Define a frequency offset of 0.3 times the subcarrier spacing to simulate a larger frequency offset.
     foff = 0.3 * df_sub
+
+    # Apply the frequency offset to the transmitted signal to
+    # simulate the effect of frequency offset on the received symbols.
     rx = apply_frequency_offset(tx, foff, fs)
+
+    # correct the frequency offset by applying an opposite rotation to the received signal.
     rx_corrected = apply_frequency_offset(rx, -foff, fs)   # opposite rotation
+
+    # Demodulate the received time-domain OFDM signal back into symbols using the FFT,
     rx_sym_corr = ofdm_demodulate(rx_corrected, N, active)
+
+    # Calculate the bit error rate (BER) before and after the frequency offset correction
+    # by comparing the original transmitted bits with the received bits.
     err_before = ber(bits, qpsk_demodulate(ofdm_demodulate(rx, N, active)))
     err_after = ber(bits, qpsk_demodulate(rx_sym_corr))
 
+    # Create a plot with two subplots to visualize the effect of frequency offset correction on the received symbols.
     fig, ax = plt.subplots(1, 2, figsize=(9, 4.4))
     rx_sym = ofdm_demodulate(rx, N, active)
     ax[0].scatter(np.real(rx_sym), np.imag(rx_sym), color="C3", zorder=3)
