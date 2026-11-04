@@ -32,7 +32,7 @@ def connect_pluto_rx():
     """
     try:
         print("Connecting to PlutoSDR via USB (usb:0.3.5)...")
-        dev = adi.Pluto("usb:0.3.5")
+        dev = adi.Pluto("usb:1.5.5")
         _ = dev.sample_rate  # sanity check
         print("Connected to PlutoSDR via USB")
         return dev
@@ -224,10 +224,10 @@ pilot_spacing = 4        # Spacing of pilot tones for channel tracking.
 pilot_val = 1 + 1j       # The known complex value of the pilots.
 
 # -- SDR and Channel Parameters --
-carrier_freq = 2.4e9     # Carrier frequency (must be tuned to the same frequency as the transmitter).
+carrier_freq = 915e6     # Carrier frequency (must be tuned to the same frequency as the transmitter).
 subcarrier_spacing = 15e3  # Subcarrier spacing in Hz.
 sampling_rate = n_fft * subcarrier_spacing  # The baseband sampling rate of the system.
-receive_gain = 35        # Receiver gain in dB. This is a critical parameter to tune for the specific environment.
+receive_gain = 25        # Receiver gain in dB. This is a critical parameter to tune for the specific environment.
 phase_slope_tracking = False  # Pilot phase correction per symbol:
                               #   False: one common phase (residual CFO)
                               #   True : common phase + phase slope across

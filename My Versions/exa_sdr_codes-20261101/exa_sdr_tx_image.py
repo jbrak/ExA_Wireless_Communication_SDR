@@ -11,18 +11,18 @@
 #   macOS   : DELETE everything from this BEGIN line down to the END line
 #             below. On a Mac these Windows paths break "import iio".
 # ##########################################################################
-import ctypes.util
-
-original_find_library = ctypes.util.find_library
-
-def my_find_library(name):
-    if name in ("iio", "libiio"):
-        return r"C:\Windows\System32\libiio.dll"
-    if name == "c":
-        return "ucrtbase.dll"
-    return original_find_library(name)
-
-ctypes.util.find_library = my_find_library
+# import ctypes.util
+#
+# original_find_library = ctypes.util.find_library
+#
+# def my_find_library(name):
+#     if name in ("iio", "libiio"):
+#         return r"C:\Windows\System32\libiio.dll"
+#     if name == "c":
+#         return "ucrtbase.dll"
+#     return original_find_library(name)
+#
+# ctypes.util.find_library = my_find_library
 # ##########################################################################
 # <<< WINDOWS-ONLY BLOCK - END <<<
 #   macOS: delete up to and including this line.

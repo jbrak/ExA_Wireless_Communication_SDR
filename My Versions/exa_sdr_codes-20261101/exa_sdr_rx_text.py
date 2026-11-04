@@ -34,7 +34,7 @@ N_FFT      = 64
 CP_LEN     = 16
 PILOT_VAL  = 1 + 0j
 PREAMBLE_SEED = 12345
-MESSAGE = "HELLO OFDM FROM PLUTO 123"
+MESSAGE = "HELLO OFDM FROM PLUTO 1234"
 USE_RANDOM_BITS = False
 N_RANDOM_BITS = 2000
 
@@ -42,7 +42,7 @@ CARRIER_FREQ       = 2.4e9
 SUBCARRIER_SPACING = 15e3
 SAMPLING_RATE      = N_FFT * SUBCARRIER_SPACING
 RECEIVE_GAIN       = 10
-PLUTO_URI          = "usb:0.3.5"   # address from `iio_info -S usb`, or "ip:192.168.2.1"
+PLUTO_URI          = "usb:1.5.5"   # address from `iio_info -S usb`, or "ip:192.168.2.1"
 DETECT_THRESHOLD   = 0.6      # on the normalised detection metric (0..1)
 
 # subcarrier allocation (identical to transmitter)
