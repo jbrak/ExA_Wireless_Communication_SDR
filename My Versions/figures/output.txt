@@ -1,0 +1,62 @@
+============================================================
+ ExA Part 1 - Simulation-Based OFDM
+============================================================
+
+=== Task 1: Signals and FFT review ===
+   [saved] figures/task1_single_sinusoid.png
+  Single tone peak should be at 50 Hz -> found at 50.8 Hz
+   [saved] figures/task1_two_sinusoids.png
+   [saved] figures/task1_sampling_rate_aliasing.png
+  fs=500 Hz < 2*300 Hz -> 300 Hz tone aliases to 200 Hz (Nyquist violated).
+   [saved] figures/task1_frequency_resolution.png
+  Two tones 100/130 Hz: resolved with large N, blurred with small N (df = fs/N).
+
+=== Task 2: Digital symbols (BPSK / QPSK) ===
+  BPSK round-trip OK   (bits = [0, 1, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 1, 0, 0, 0])
+  QPSK round-trip OK   (symbol power = 1.000, should be 1.0)
+   [saved] figures/task2_constellations.png
+
+=== Task 3: Basic OFDM symbol (ideal channel) ===
+  BPSK: BER over ideal channel = 0e+00 (expected 0).  Recovered symbols match: True
+  QPSK: BER over ideal channel = 0e+00 (expected 0).  Recovered symbols match: True
+   [saved] figures/task3_ofdm_ideal.png
+
+=== Task 4: Adding noise (AWGN) ===
+   [saved] figures/task4_noisy_constellations.png
+  Lower SNR -> received symbols spread further from ideal points.
+   [saved] figures/task4_ber_vs_snr.png
+  BER decreases as SNR rises (simulation tracks theory):
+    SNR= -8.0 dB  BPSK=1.31e-01  QPSK=2.12e-01
+    SNR= -4.0 dB  BPSK=3.78e-02  QPSK=1.01e-01
+    SNR=  0.0 dB  BPSK=2.46e-03  QPSK=2.34e-02
+    SNR=  4.0 dB  BPSK=0.00e+00  QPSK=9.06e-04
+
+=== Task 5: Cyclic prefix and multipath ===
+
+  Channel: h = [1, 0, 0.4]  (sheet example, mild)   memory = 2 samples (CP = 16)
+    WITHOUT CP : BER = 0.000e+00   EVM = 0.0057
+    WITH    CP : BER = 0.000e+00   EVM = 0.0000
+
+  Channel: h = [1,0,0,0,0,0.7]  (stronger, delay 5)   memory = 5 samples (CP = 16)
+    WITHOUT CP : BER = 6.594e-03   EVM = 0.1005
+    WITH    CP : BER = 0.000e+00   EVM = 0.0000
+
+  Even a mild echo distorts the subcarriers (EVM > 0) without a CP;
+  a stronger echo turns that distortion into actual bit errors.
+  Adding a cyclic prefix longer than the channel memory turns the
+  channel into a clean per-subcarrier multiply -> EVM ~ 0, BER = 0
+  after one-tap equalisation.  (All runs here are noise-free, so the
+  only impairment is the multipath.)
+   [saved] figures/task5_cyclic_prefix.png
+
+=== Task 6: Frequency offset ===
+   [saved] figures/task6_frequency_offset.png
+  Small offset -> the whole constellation rotates.
+  Larger offset -> subcarriers leak into each other (ICI), so the
+  points also smear out, not just rotate.
+   [saved] figures/task6_offset_correction.png
+  Optional correction: BER 3.44e-01 -> 0.00e+00 (works because the offset is known).
+
+All Part 1 tasks completed.
+
+Process finished with exit code 0
